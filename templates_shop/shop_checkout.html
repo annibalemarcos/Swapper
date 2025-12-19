@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - TechStore</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: #f8f9fa; }
+        .navbar { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .checkout-card { background: white; border-radius: 15px; padding: 30px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-dark navbar-expand-lg mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="/"><i class="fas fa-store"></i> <strong>TechStore</strong></a>
+        </div>
+    </nav>
+
+    <div class="container mb-5">
+        <h2 class="mb-4"><i class="fas fa-credit-card"></i> Finalizar Compra</h2>
+        
+        <div class="row">
+            <div class="col-lg-7">
+                <div class="checkout-card mb-4">
+                    <h4 class="mb-3">Dados de Entrega</h4>
+                    <form id="checkoutForm">
+                        <div class="mb-3">
+                            <label class="form-label">Nome Completo</label>
+                            <input type="text" class="form-control" id="name" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Endereço Completo</label>
+                            <textarea class="form-control" id="address" rows="3" required></textarea>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-lock"></i> Ir para Pagamento
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-lg-5">
+                <div class="checkout-card">
+                    <h4 class="mb-3">Resumo do Pedido</h4>
+                    
+                    {% for item in cart %}
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>{{ item.name }} ({{ item.quantity }}x)</span>
+                        <strong>R$ {{ "%.2f"|format(item.price * item.quantity) }}</strong>
+                    </div>
+                    {% endfor %}
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between mb-4">
+                        <h5>Total:</h5>
+                        <h4 class="text-success">R$ {{ "%.2f"|format(total) }}</h4>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <i class="fas fa-coins"></i> 
+                        <strong>Pagamento com Crypto</strong>
+                        <p class="mb-0 small">Você será redirecionado para escolher a criptomoeda</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.getElementById('checkoutForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processando...';
+            
+            const data = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                address: document.getElementById('address').value
+            };
+
+            try {
+                const response = await fetch('/api/checkout/process', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Redirecionar para gateway de pagamento
+                    window.location.href = result.checkout_url;
+                } else {
+                    alert('❌ Erro: ' + result.error);
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-lock"></i> Ir para Pagamento';
+                }
+            } catch (error) {
+                alert('❌ Erro ao processar pedido: ' + error);
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-lock"></i> Ir para Pagamento';
+            }
+        });
+    </script>
+</body>
+</html>

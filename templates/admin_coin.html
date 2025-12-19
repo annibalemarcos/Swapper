@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ coin.symbol }} Admin - Dummy Crypto Swap</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            margin-bottom: 20px;
+        }
+        .navbar {
+            background: rgba(255,255,255,0.95) !important;
+            backdrop-filter: blur(10px);
+        }
+        .coin-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .action-card {
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        .action-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.4);
+        }
+        .table-responsive {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .address-truncate {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            display: inline-block;
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="fas fa-coins text-warning"></i> Dummy Crypto Swap
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="/">
+                    <i class="fas fa-cube"></i> Explorer
+                </a>
+                <a class="nav-link" href="/swap">
+                    <i class="fas fa-exchange-alt"></i> Swap
+                </a>
+                <a class="nav-link active" href="/admin">
+                    <i class="fas fa-cog"></i> Admin
+                </a>
+                <a class="nav-link" href="/admin/rates">
+                    <i class="fas fa-chart-line"></i> Cotações
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Toast Container -->
+    <div class="toast-container">
+        <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
+            <div class="d-flex">
+                <div class="toast-body" id="toastMessage"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Header da Moeda -->
+        <div class="coin-header">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h1 class="display-4 mb-2">
+                        <i class="fas fa-coins"></i> {{ coin.symbol }}
+                    </h1>
+                    <h3>{{ coin.name }}</h3>
+                </div>
+                <div class="col-md-6 text-end">
+                    <div class="mb-2">
+                        <small class="d-block">Total Supply</small>
+                        <h2 class="mb-0">{{ "%.2f"|format(coin.total_supply) }} {{ coin.symbol }}</h2>
+                    </div>
+                    <div>
+                        <span class="badge bg-white text-dark fs-6">{{ total_blocks }} Blocos</span>
+                        <span class="badge bg-white text-dark fs-6 ms-2">{{ total_transactions }} Transações</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ações Principais -->
+        <div class="row mb-4">
+            <div class="col-md-4 mb-3">
+                <div class="card action-card bg-success text-white">
+                    <div class="card-body text-center p-4">
+                        <i class="fas fa-plus-circle fa-3x mb-3"></i>
+                        <h4>Emitir (Mint)</h4>
+                        <p>Criar novas moedas</p>
+                        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#mintModal">
+                            <i class="fas fa-magic"></i> Mint Agora
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-3">
+                <div class="card action-card bg-danger text-white">
+                    <div class="card-body text-center p-4">
+                        <i class="fas fa-fire fa-3x mb-3"></i>
+                        <h4>Destruir (Burn)</h4>
+                        <p>Remover moedas existentes</p>
+                        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#burnModal">
+                            <i class="fas fa-fire"></i> Burn Agora
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-4 mb-3">
+                <div class="card action-card bg-primary text-white">
+                    <div class="card-body text-center p-4">
+                        <i class="fas fa-exchange-alt fa-3x mb-3"></i>
+                        <h4>Transferir</h4>
+                        <p>Enviar entre carteiras</p>
+                        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#transferModal">
+                            <i class="fas fa-paper-plane"></i> Transferir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modo Automático -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card bg-dark text-white">
+                    <div class="card-body">
+                        <h4 class="mb-4">
+                            <i class="fas fa-robot"></i> Modo Automático 
+                            <span id="simulationBadge" class="badge bg-{% if is_simulating %}success{% else %}secondary{% endif %} ms-2">
+                                {% if is_simulating %}ATIVO{% else %}INATIVO{% endif %}
+                            </span>
+                        </h4>
+                        
+                        <div class="row">
+                            <!-- Simulação Individual -->
+                            <div class="col-md-6 mb-3">
+                                <div class="card bg-secondary">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-cog"></i> Simulação {{ coin.symbol }}</h5>
+                                        <p class="small mb-3">Simula atividade randômica apenas nesta moeda</p>
+                                        
+                                        <div class="d-grid gap-2">
+                                            <button class="btn btn-success" onclick="startSimulation(false)">
+                                                <i class="fas fa-play"></i> Iniciar Simulação
+                                            </button>
+                                            <button class="btn btn-danger" onclick="stopSimulation(false)">
+                                                <i class="fas fa-stop"></i> Parar Simulação
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="mt-3">
+                                            <small class="text-light">
+                                                <i class="fas fa-info-circle"></i> 
+                                                Gera mints (30%), burns (10%) e transfers (60%) automaticamente
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Simulação Global -->
+                            <div class="col-md-6 mb-3">
+                                <div class="card bg-secondary">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-globe"></i> Simulação Global</h5>
+                                        <p class="small mb-3">Simula atividade em TODAS as moedas</p>
+                                        
+                                        <div class="d-grid gap-2">
+                                            <button class="btn btn-success" onclick="startSimulation(true)">
+                                                <i class="fas fa-rocket"></i> Iniciar Global
+                                            </button>
+                                            <button class="btn btn-danger" onclick="stopSimulation(true)">
+                                                <i class="fas fa-stop-circle"></i> Parar Global
+                                            </button>
+                                        </div>
+                                        
+                                        <div class="mt-3">
+                                            <small class="text-light">
+                                                <i class="fas fa-info-circle"></i> 
+                                                Simula vida no blockchain de todas as 6 moedas
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Operações em Lote -->
+                            <div class="col-12">
+                                <div class="card bg-secondary">
+                                    <div class="card-body">
+                                        <h5><i class="fas fa-layer-group"></i> Operações em Lote</h5>
+                                        <div class="row">
+                                            <div class="col-md-4">
+                                                <label class="form-label text-light">Tipo</label>
+                                                <select class="form-select" id="batchOperation">
+                                                    <option value="mint">Mint</option>
+                                                    <option value="burn">Burn</option>
+                                                    <option value="transfer">Transfer</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label text-light">Quantidade</label>
+                                                <input type="number" class="form-control" id="batchCount" value="10" min="1" max="100">
+                                            </div>
+                                            <div class="col-md-4">
+                                                <label class="form-label text-light">&nbsp;</label>
+                                                <button class="btn btn-primary w-100" onclick="executeBatchOperations()">
+                                                    <i class="fas fa-bolt"></i> Executar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs de Informações -->
+        <div class="card bg-white">
+            <div class="card-body">
+                <ul class="nav nav-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#blocks-tab" type="button">
+                            <i class="fas fa-cubes"></i> Blocos Recentes
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#transactions-tab" type="button">
+                            <i class="fas fa-exchange-alt"></i> Transações
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#wallets-tab" type="button">
+                            <i class="fas fa-wallet"></i> Carteiras
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content mt-4">
+                    <!-- Tab Blocos -->
+                    <div class="tab-pane fade show active" id="blocks-tab">
+                        <h5 class="mb-3">Últimos 10 Blocos</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Hash</th>
+                                        <th>Hash Anterior</th>
+                                        <th>Nonce</th>
+                                        <th>Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for block in blocks %}
+                                    <tr>
+                                        <td><strong>{{ block.block_number }}</strong></td>
+                                        <td><code class="address-truncate">{{ block.hash }}</code></td>
+                                        <td><code class="address-truncate">{{ block.previous_hash }}</code></td>
+                                        <td>{{ block.nonce }}</td>
+                                        <td><small>{{ block.timestamp }}</small></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab Transações -->
+                    <div class="tab-pane fade" id="transactions-tab">
+                        <h5 class="mb-3">Últimas 20 Transações</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Tipo</th>
+                                        <th>De</th>
+                                        <th>Para</th>
+                                        <th>Quantidade</th>
+                                        <th>Bloco</th>
+                                        <th>Data</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tx in transactions %}
+                                    <tr>
+                                        <td>
+                                            {% if tx.tx_type == 'mint' %}
+                                            <span class="badge bg-success">MINT</span>
+                                            {% elif tx.tx_type == 'burn' %}
+                                            <span class="badge bg-danger">BURN</span>
+                                            {% else %}
+                                            <span class="badge bg-primary">TRANSFER</span>
+                                            {% endif %}
+                                        </td>
+                                        <td><code class="address-truncate">{{ tx.from_address }}</code></td>
+                                        <td><code class="address-truncate">{{ tx.to_address }}</code></td>
+                                        <td><strong>{{ "%.4f"|format(tx.amount) }}</strong></td>
+                                        <td>{{ tx.block_number }}</td>
+                                        <td><small>{{ tx.timestamp }}</small></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Tab Carteiras -->
+                    <div class="tab-pane fade" id="wallets-tab">
+                        <h5 class="mb-3">Top 20 Carteiras por Saldo</h5>
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Endereço</th>
+                                        <th>Saldo</th>
+                                        <th>Criada Em</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for wallet in wallets %}
+                                    <tr>
+                                        <td>{{ loop.index }}</td>
+                                        <td><code>{{ wallet.address }}</code></td>
+                                        <td><strong class="text-success">{{ "%.4f"|format(wallet.balance) }} {{ coin.symbol }}</strong></td>
+                                        <td><small>{{ wallet.created_at }}</small></td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-outline-primary mt-3" onclick="generateNewAddress()">
+                            <i class="fas fa-plus"></i> Gerar Novo Endereço
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Mint -->
+    <div class="modal fade" id="mintModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-plus-circle"></i> Emitir {{ coin.symbol }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="mintForm">
+                        <div class="mb-3">
+                            <label class="form-label">Quantidade</label>
+                            <input type="number" class="form-control" id="mintAmount" step="0.01" min="0.01" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Endereço de Destino (deixe vazio para gerar novo)</label>
+                            <input type="text" class="form-control" id="mintAddress" placeholder="{{ coin.prefix }}...">
+                        </div>
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="fas fa-magic"></i> Emitir Moedas
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Burn -->
+    <div class="modal fade" id="burnModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-fire"></i> Destruir {{ coin.symbol }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="burnForm">
+                        <div class="mb-3">
+                            <label class="form-label">Endereço de Origem</label>
+                            <input type="text" class="form-control" id="burnAddress" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Quantidade</label>
+                            <input type="number" class="form-control" id="burnAmount" step="0.01" min="0.01" required>
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100">
+                            <i class="fas fa-fire"></i> Destruir Moedas
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Transfer -->
+    <div class="modal fade" id="transferModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">
+                        <i class="fas fa-exchange-alt"></i> Transferir {{ coin.symbol }}
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="transferForm">
+                        <div class="mb-3">
+                            <label class="form-label">De (Endereço de Origem)</label>
+                            <input type="text" class="form-control" id="transferFrom" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Para (Endereço de Destino)</label>
+                            <input type="text" class="form-control" id="transferTo" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Quantidade</label>
+                            <input type="number" class="form-control" id="transferAmount" step="0.01" min="0.01" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-paper-plane"></i> Enviar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const coinId = {{ coin.id }};
+        const coinSymbol = "{{ coin.symbol }}";
+
+        function showToast(message) {
+            document.getElementById('toastMessage').textContent = message;
+            const toast = new bootstrap.Toast(document.getElementById('successToast'));
+            toast.show();
+            setTimeout(() => location.reload(), 2000);
+        }
+
+        // Form Mint
+        document.getElementById('mintForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const amount = document.getElementById('mintAmount').value;
+            const address = document.getElementById('mintAddress').value || '';
+            
+            try {
+                const response = await fetch('/api/mint', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({coin_id: coinId, address: address, amount: amount})
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('mintModal')).hide();
+                    showToast(`${amount} ${coinSymbol} emitidos com sucesso!`);
+                } else {
+                    alert('Erro: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                alert('Erro ao emitir moedas');
+            }
+        });
+
+        // Form Burn
+        document.getElementById('burnForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const address = document.getElementById('burnAddress').value;
+            const amount = document.getElementById('burnAmount').value;
+            
+            try {
+                const response = await fetch('/api/burn', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({coin_id: coinId, address: address, amount: amount})
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('burnModal')).hide();
+                    showToast(`${amount} ${coinSymbol} destruídos com sucesso!`);
+                } else {
+                    alert('Erro: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                alert('Erro ao destruir moedas');
+            }
+        });
+
+        // Form Transfer
+        document.getElementById('transferForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const from = document.getElementById('transferFrom').value;
+            const to = document.getElementById('transferTo').value;
+            const amount = document.getElementById('transferAmount').value;
+            
+            try {
+                const response = await fetch('/api/transfer', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        coin_id: coinId, 
+                        from_address: from, 
+                        to_address: to, 
+                        amount: amount
+                    })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('transferModal')).hide();
+                    showToast(`${amount} ${coinSymbol} transferidos com sucesso!`);
+                } else {
+                    alert('Erro: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                alert('Erro ao transferir moedas');
+            }
+        });
+
+        async function generateNewAddress() {
+            try {
+                const response = await fetch('/api/generate-address/' + coinSymbol);
+                const data = await response.json();
+                if (data.address) {
+                    alert('Novo endereço gerado:\n' + data.address);
+                    navigator.clipboard.writeText(data.address);
+                }
+            } catch (error) {
+                alert('Erro ao gerar endereço');
+            }
+        }
+
+        // Simulação
+        async function startSimulation(allCoins) {
+            const response = await fetch('/api/simulation/start', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    coin_id: allCoins ? null : coinId,
+                    all_coins: allCoins,
+                    operations_per_cycle: 5,
+                    delay: 2
+                })
+            });
+            const data = await response.json();
+            if (data.success) showToast(data.message);
+        }
+
+        async function stopSimulation(allCoins) {
+            const response = await fetch('/api/simulation/stop', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    coin_id: allCoins ? null : coinId,
+                    all_coins: allCoins
+                })
+            });
+            const data = await response.json();
+            if (data.success) showToast(data.message);
+        }
+
+        async function executeBatchOperations() {
+            const operation = document.getElementById('batchOperation').value;
+            const count = document.getElementById('batchCount').value;
+            
+            if (!confirm(`Executar ${count} operações de ${operation}?`)) return;
+            
+            const response = await fetch('/api/batch-operations', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    coin_id: coinId,
+                    operation_type: operation,
+                    count: parseInt(count)
+                })
+            });
+            const data = await response.json();
+            if (data.success) showToast(`${data.total_operations} operações concluídas!`);
+        }
+    </script>
+</body>
+</html>

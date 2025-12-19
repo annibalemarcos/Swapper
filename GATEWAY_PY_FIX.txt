@@ -1,0 +1,36 @@
+
+# ==================== SUBSTITUIR NO gateway.py ====================
+# Localize a função check_deposit_balance e SUBSTITUA por esta:
+
+def check_deposit_balance(address, crypto):
+    """Verifica saldo REAL no sistema swap via API"""
+    try:
+        import requests
+        
+        # Mapear crypto para coin_id
+        crypto_to_id = {
+            'D1': 1, 'D2': 2, 'D3': 3,
+            'D4': 4, 'D5': 5, 'D6': 6
+        }
+        
+        coin_id = crypto_to_id.get(crypto)
+        if not coin_id:
+            return 0
+        
+        # Buscar saldo REAL via API do swap
+        response = requests.get(
+            f'http://localhost:5581/api/wallet/{coin_id}/{address}',
+            timeout=5
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            balance = data.get('balance', 0)
+            if balance > 0:
+                print(f"💰 Saldo detectado: {balance} {crypto} no endereço {address[:20]}...")
+            return balance
+        
+        return 0
+        
+    except Exception as e:
+        return 0

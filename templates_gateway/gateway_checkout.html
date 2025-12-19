@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Checkout - {{ merchant.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px 0; }
+        .checkout-card { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); max-width: 600px; margin: 0 auto; }
+        .crypto-btn { border: 2px solid #e0e0e0; padding: 20px; border-radius: 15px; cursor: pointer; transition: all 0.3s; margin: 10px 0; }
+        .crypto-btn:hover { border-color: #667eea; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3); }
+        .deposit-box { background: #f8f9fa; border: 3px dashed #667eea; padding: 25px; border-radius: 15px; text-align: center; margin: 20px 0; }
+        .amount-display { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 15px; text-align: center; margin: 20px 0; }
+        .pulse { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .step-guide { background: #e8f4f8; border-left: 4px solid #17a2b8; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .step-guide ol { margin-bottom: 0; padding-left: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="checkout-card">
+            {% if invoice.status == 'paid' %}
+            <!-- PAGAMENTO CONFIRMADO -->
+            <div class="text-center">
+                <i class="fas fa-check-circle fa-5x text-success mb-4"></i>
+                <h2 class="text-success">Pagamento Confirmado!</h2>
+                <p class="lead">Obrigado por sua compra</p>
+                <div class="alert alert-success mt-4">
+                    <strong>Invoice:</strong> {{ invoice.invoice_id }}<br>
+                    <strong>Valor:</strong> R$ {{ "%.2f"|format(invoice.amount_brl) }}<br>
+                    <strong>Crypto Recebida:</strong> {{ "%.2f"|format(invoice.crypto_received or 0) }} {{ invoice.payment_crypto }}<br>
+                    <strong>PIX Enviado:</strong> R$ {{ "%.2f"|format(invoice.pix_sent or 0) }}
+                </div>
+                <a href="http://localhost:5586" class="btn btn-primary btn-lg mt-3">
+                    <i class="fas fa-store"></i> Voltar para Loja
+                </a>
+            </div>
+            
+            {% else %}
+            <!-- PROCESSO DE PAGAMENTO -->
+            <div class="text-center mb-4">
+                <h4>{{ merchant.name }}</h4>
+                <p class="text-muted">{{ invoice.description or 'Pagamento' }}</p>
+            </div>
+
+            <div class="amount-display">
+                <h2 class="mb-0">R$ {{ "%.2f"|format(invoice.amount_brl) }}</h2>
+                <p class="mb-0">Valor Total</p>
+            </div>
+
+            {% if not invoice.payment_crypto %}
+            <!-- SELEÇÃO DE CRIPTOMOEDA -->
+            <h5 class="mb-3 text-center">Escolha a Criptomoeda para Pagamento:</h5>
+            
+            <div class="row">
+                {% for crypto, rate in rates.items() %}
+                <div class="col-md-6 mb-2">
+                    <div class="crypto-btn" onclick="selectCrypto('{{ crypto }}', {{ rate }})">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h5 class="mb-1"><i class="fas fa-coins text-warning"></i> {{ crypto }}</h5>
+                                <small class="text-muted">R$ {{ "%.2f"|format(rate) }} cada</small>
+                            </div>
+                            <div class="text-end">
+                                <strong class="text-primary">{{ "%.2f"|format(invoice.amount_brl / rate) }}</strong>
+                                <small class="d-block text-muted">{{ crypto }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% else %}
+            <!-- AGUARDANDO PAGAMENTO -->
+            <div class="alert alert-info">
+                <h6><i class="fas fa-info-circle"></i> Instruções de Pagamento</h6>
+                <p class="mb-0">Envie <strong>exatamente {{ "%.2f"|format(invoice.payment_amount or 0) }} {{ invoice.payment_crypto }}</strong> para o endereço abaixo.</p>
+            </div>
+
+            <div class="deposit-box">
+                <h6 class="mb-3 text-muted">Endereço de Depósito:</h6>
+                <h5 id="depositAddress" style="word-break: break-all; font-family: 'Courier New', monospace; color: #333;">
+                    {{ invoice.deposit_address }}
+                </h5>
+                <button class="btn btn-primary mt-3" onclick="copyAddress()">
+                    <i class="fas fa-copy"></i> Copiar Endereço
+                </button>
+            </div>
+
+            <div class="row text-center mb-3">
+                <div class="col-6">
+                    <h6 class="text-muted">Você Envia:</h6>
+                    <h4 class="text-danger">{{ "%.2f"|format(invoice.payment_amount or 0) }} {{ invoice.payment_crypto }}</h4>
+                </div>
+                <div class="col-6">
+                    <h6 class="text-muted">Você Paga:</h6>
+                    <h4 class="text-success">R$ {{ "%.2f"|format(invoice.amount_brl) }}</h4>
+                </div>
+            </div>
+
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> 
+                <strong>IMPORTANTE:</strong> Envie o valor exato. Valores diferentes não serão processados.
+            </div>
+
+            <div class="alert alert-primary text-center pulse">
+                <i class="fas fa-sync-alt fa-spin"></i> <strong>Aguardando Pagamento...</strong>
+                <p class="mb-0 mt-2 small">O sistema detectará automaticamente quando as moedas forem recebidas (atualiza a cada 5 segundos)</p>
+            </div>
+
+            <!-- INSTRUÇÕES PASSO A PASSO -->
+            <div class="step-guide">
+                <h6 class="mb-3"><i class="fas fa-terminal text-info"></i> Como Enviar o Pagamento:</h6>
+                <ol>
+                    <li><strong>Copie</strong> o endereço de depósito acima</li>
+                    <li><strong>Acesse</strong> o Block Explorer: <a href="http://localhost:5581/admin" target="_blank" class="fw-bold">Block Explorer Admin</a></li>
+                    <li><strong>Selecione</strong> a moeda <span class="badge bg-primary">{{ invoice.payment_crypto }}</span></li>
+                    <li><strong>Clique</strong> em "Transferir {{ invoice.payment_crypto }}"</li>
+                    <li><strong>Cole</strong> o endereço no campo "Para (Endereço de Destino)"</li>
+                    <li><strong>Digite</strong> a quantidade: <span class="badge bg-danger">{{ "%.2f"|format(invoice.payment_amount or 0) }}</span></li>
+                    <li><strong>Clique</strong> em "Transferir" e aguarde a confirmação</li>
+                    <li><strong>Volte</strong> para esta página - em até 5 segundos o pagamento será detectado!</li>
+                </ol>
+            </div>
+
+            <div class="text-center mt-3">
+                <small class="text-muted">
+                    <i class="fas fa-shield-alt"></i> Pagamento 100% seguro via blockchain
+                </small>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function selectCrypto(crypto, rate) {
+            const response = await fetch('/api/checkout/select-crypto', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    invoice_id: '{{ invoice.invoice_id }}',
+                    crypto: crypto
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('❌ Erro: ' + data.error);
+            }
+        }
+
+        function copyAddress() {
+            const address = document.getElementById('depositAddress').textContent.trim();
+            navigator.clipboard.writeText(address).then(() => {
+                alert('✅ Endereço copiado para área de transferência!\n\nAgora acesse o Block Explorer Admin e envie as moedas.');
+            }).catch(() => {
+                alert('❌ Erro ao copiar. Copie manualmente o endereço.');
+            });
+        }
+
+        // Auto-refresh a cada 5 segundos se aguardando pagamento
+        {% if invoice.status == 'pending' and invoice.payment_crypto %}
+        setInterval(() => {
+            location.reload();
+        }, 5000);
+        {% endif %}
+    </script>
+</body>
+</html>

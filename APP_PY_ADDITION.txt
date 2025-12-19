@@ -1,0 +1,21 @@
+
+# ==================== ADICIONAR NO app.py ====================
+# Cole este código ANTES do "if __name__ == '__main__':"
+
+@app.route('/api/wallet/<int:coin_id>/<address>')
+def api_get_wallet_balance(coin_id, address):
+    """Retorna saldo de uma carteira específica"""
+    balance = get_wallet_balance(coin_id, address)
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('SELECT symbol FROM coins WHERE id = ?', (coin_id,))
+    coin = cursor.fetchone()
+    conn.close()
+    
+    return jsonify({
+        'address': address,
+        'coin_id': coin_id,
+        'symbol': coin['symbol'] if coin else None,
+        'balance': balance
+    })

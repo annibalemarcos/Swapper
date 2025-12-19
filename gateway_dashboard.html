@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - {{ merchant.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); min-height: 100vh; padding: 20px 0; }
+        .navbar { background: rgba(255,255,255,0.95) !important; }
+        .card { border-radius: 15px; margin-bottom: 20px; }
+        .stat-card { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 25px; border-radius: 15px; }
+        .api-key-box { background: #f8f9fa; border: 2px dashed #667eea; padding: 15px; border-radius: 10px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">💳 Crypto Gateway</a>
+            <div class="navbar-nav ms-auto">
+                <span class="nav-link">{{ merchant.name }}</span>
+                <a class="nav-link" href="/merchant/logout">Sair</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- Estatísticas -->
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="stat-card text-center">
+                    <i class="fas fa-file-invoice fa-2x mb-2"></i>
+                    <h3>{{ stats.total }}</h3>
+                    <p>Invoices Totais</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card text-center" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+                    <i class="fas fa-check-circle fa-2x mb-2"></i>
+                    <h3>{{ stats.count_paid }}</h3>
+                    <p>Pagos</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="stat-card text-center" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+                    <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
+                    <h3>R$ {{ "%.2f"|format(stats.total_paid or 0) }}</h3>
+                    <p>Total Recebido</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Informações da Conta -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-key text-primary"></i> Sua API Key</h5>
+                        <div class="api-key-box">
+                            <div id="apiKey">{{ merchant.api_key }}</div>
+                        </div>
+                        <button class="btn btn-sm btn-outline-primary mt-2" onclick="copyApiKey()">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                        <small class="text-muted d-block mt-2">Use esta chave para criar invoices via API</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title"><i class="fas fa-cog text-success"></i> Configurações</h5>
+                        <p><strong>Chave PIX:</strong> {{ merchant.pix_key }}</p>
+                        <p><strong>Email:</strong> {{ merchant.email }}</p>
+                        {% if merchant.webhook_url %}
+                        <p><strong>Webhook:</strong> <code>{{ merchant.webhook_url }}</code></p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Criar Nova Invoice -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-plus-circle"></i> Criar Nova Invoice</h5>
+                <form id="createInvoiceForm" class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Valor (BRL)</label>
+                        <input type="number" class="form-control" id="amount" step="0.01" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Descrição</label>
+                        <input type="text" class="form-control" id="description" placeholder="Ex: Pedido #123">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Email Cliente</label>
+                        <input type="email" class="form-control" id="customer_email" placeholder="cliente@email.com">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-file-invoice"></i> Criar Invoice
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Invoices -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title"><i class="fas fa-list"></i> Invoices Recentes</h5>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Valor</th>
+                                <th>Descrição</th>
+                                <th>Status</th>
+                                <th>Crypto</th>
+                                <th>Data</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inv in invoices %}
+                            <tr>
+                                <td><code>{{ inv.invoice_id[:12] }}...</code></td>
+                                <td><strong>R$ {{ "%.2f"|format(inv.amount_brl) }}</strong></td>
+                                <td>{{ inv.description or '-' }}</td>
+                                <td>
+                                    {% if inv.status == 'pending' %}
+                                    <span class="badge bg-warning">PENDENTE</span>
+                                    {% else %}
+                                    <span class="badge bg-success">PAGO</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ inv.payment_crypto or '-' }}</td>
+                                <td><small>{{ inv.created_at[:16] }}</small></td>
+                                <td>
+                                    <a href="/checkout/{{ inv.invoice_id }}" class="btn btn-sm btn-outline-primary" target="_blank">
+                                        <i class="fas fa-external-link-alt"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function copyApiKey() {
+            const key = document.getElementById('apiKey').textContent;
+            navigator.clipboard.writeText(key);
+            alert('✅ API Key copiada!');
+        }
+
+        document.getElementById('createInvoiceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const data = {
+                api_key: '{{ merchant.api_key }}',
+                amount: parseFloat(document.getElementById('amount').value),
+                description: document.getElementById('description').value,
+                customer_email: document.getElementById('customer_email').value
+            };
+
+            try {
+                const response = await fetch('/api/invoice/create', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('✅ Invoice criada!');
+                    window.open(result.checkout_url, '_blank');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    alert('❌ Erro: ' + result.error);
+                }
+            } catch (error) {
+                alert('❌ Erro ao criar invoice');
+            }
+        });
+
+        // Auto-refresh a cada 15 segundos
+        setTimeout(() => location.reload(), 15000);
+    </script>
+</body>
+</html>

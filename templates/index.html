@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dummy Crypto Swap - Block Explorer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        .card {
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            transition: transform 0.3s;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        .coin-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            cursor: pointer;
+        }
+        .coin-card h3 {
+            font-weight: bold;
+        }
+        .navbar {
+            background: rgba(255,255,255,0.95) !important;
+            backdrop-filter: blur(10px);
+        }
+        .badge-custom {
+            font-size: 0.9rem;
+            padding: 8px 12px;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="/">
+                <i class="fas fa-coins text-warning"></i> Dummy Crypto Swap
+            </a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link active" href="/">
+                    <i class="fas fa-cube"></i> Explorer
+                </a>
+                <a class="nav-link" href="/swap">
+                    <i class="fas fa-exchange-alt"></i> Swap
+                </a>
+                <a class="nav-link" href="/admin">
+                    <i class="fas fa-cog"></i> Admin
+                </a>
+                <a class="nav-link" href="/admin/rates">
+                    <i class="fas fa-chart-line"></i> Cotações
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card bg-white">
+                    <div class="card-body text-center py-5">
+                        <h1 class="display-4 mb-3">
+                            <i class="fas fa-search-dollar text-primary"></i> 
+                            Block Explorer
+                        </h1>
+                        <p class="lead text-muted">
+                            Explore as 6 Dummy Coins - Sistema de Blockchain Simulado
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row" id="coinsContainer">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-light" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        async function loadCoins() {
+            try {
+                const response = await fetch('/api/coins');
+                const coins = await response.json();
+                
+                const container = document.getElementById('coinsContainer');
+                container.innerHTML = '';
+                
+                coins.forEach(coin => {
+                    const gradients = [
+                        'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                        'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+                        'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+                        'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+                        'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+                        'linear-gradient(135deg, #30cfd0 0%, #330867 100%)'
+                    ];
+                    
+                    const gradient = gradients[coin.id - 1] || gradients[0];
+                    
+                    const col = document.createElement('div');
+                    col.className = 'col-md-6 col-lg-4 mb-4';
+                    col.innerHTML = `
+                        <div class="card coin-card" style="background: ${gradient};" 
+                             onclick="window.location.href='/admin/coin/${coin.id}'">
+                            <div class="card-body text-center p-4">
+                                <h3><i class="fas fa-coins"></i> ${coin.symbol}</h3>
+                                <h5 class="mb-3">${coin.name}</h5>
+                                <div class="d-flex justify-content-around mt-4">
+                                    <div>
+                                        <small class="d-block">Total Supply</small>
+                                        <strong class="fs-5">${coin.total_supply.toFixed(2)}</strong>
+                                    </div>
+                                    <div>
+                                        <small class="d-block">Prefixo</small>
+                                        <strong class="fs-5">${coin.prefix}...</strong>
+                                    </div>
+                                </div>
+                                <div class="mt-3">
+                                    <span class="badge bg-white text-dark badge-custom">
+                                        <i class="fas fa-chart-line"></i> Ver Detalhes
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.appendChild(col);
+                });
+            } catch (error) {
+                console.error('Erro ao carregar moedas:', error);
+            }
+        }
+        
+        loadCoins();
+    </script>
+</body>
+</html>

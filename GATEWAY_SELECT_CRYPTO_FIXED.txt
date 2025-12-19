@@ -1,0 +1,50 @@
+
+# ==================== SUBSTITUIR NO gateway.py ====================
+# Procure por: @app.route('/api/checkout/select-crypto', methods=['POST'])
+# Substitua TODA a função por esta versão corrigida:
+
+@app.route('/api/checkout/select-crypto', methods=['POST'])
+def api_select_crypto():
+    data = request.json
+    invoice_id = data.get('invoice_id')
+    crypto = data.get('crypto')
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM invoices WHERE invoice_id = ?', (invoice_id,))
+    invoice = cursor.fetchone()
+    
+    if not invoice or invoice['status'] != 'pending':
+        conn.close()
+        return jsonify({'error': 'Invoice inválida'}), 400
+    
+    rates = get_crypto_rates()
+    crypto_amount = invoice['amount_brl'] / rates.get(crypto, 10)
+    
+    # CORREÇÃO: Gerar endereço com prefixo correto (compatível com o swap system)
+    coin_prefixes = {
+        'D1': 'd1', 'D2': 'd2', 'D3': 'd3',
+        'D4': 'd4', 'D5': 'd5', 'D6': 'd6'
+    }
+    prefix = coin_prefixes.get(crypto, crypto.lower())
+    deposit_address = f"{prefix}_{secrets.token_hex(20)}"
+    
+    cursor.execute("""
+        UPDATE invoices
+        SET payment_crypto = ?, payment_amount = ?, deposit_address = ?
+        WHERE invoice_id = ?
+    """, (crypto, crypto_amount, deposit_address, invoice_id))
+    
+    conn.commit()
+    conn.close()
+    
+    log_info(f"Endereço gerado: {deposit_address} para {crypto_amount:.4f} {crypto}")
+    
+    return jsonify({
+        'success': True,
+        'crypto': crypto,
+        'amount': round(crypto_amount, 4),
+        'deposit_address': deposit_address,
+        'rate': rates.get(crypto)
+    })
